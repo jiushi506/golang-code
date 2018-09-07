@@ -33,7 +33,21 @@ func main() {
 	//wait_group_test()
 	//unsafe_pointer_uintptr_test()
 	//var_test()
-	map_test()
+	//map_test()
+	pointer_test()
+
+}
+func pointer_test() {
+	a := new(int)
+	*a = 3
+	fmt.Println("a地址:",&a)   // #1 输出指针自身的地址
+	fmt.Println("a指向的地址:",a)  // #2  输出指针变量指向的地址
+	invoke_point(a)
+
+}
+func invoke_point(b *int) {
+	fmt.Println("a参数地址:",&b)  // #3  输出和#1不一样，因为是值传递，复制了一个地址
+	fmt.Println("a参数指向的地址:",b)  //#4  输出和#2一样，因为指针指向的地址是一样的
 }
 
 func map_test() {
@@ -43,6 +57,7 @@ func map_test() {
 	value,ok = m["name don't exist"]
 	fmt.Println(value,ok)
 	fmt.Println(&m)
+	fmt.Println(1 << 0) // 1
 }
 
 func var_test() {
