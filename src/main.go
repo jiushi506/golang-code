@@ -39,7 +39,7 @@ func main() {
 	ginpprof_test();
 }
 
-func ginpprof_test() {
+func ginpprof_test() {   //https://github.com/jiushi506/ginpprof
 	router := gin.Default()
 
 	router.GET("/ping", func(c *gin.Context) {
