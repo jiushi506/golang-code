@@ -11,8 +11,13 @@ import (
 	"io"
 	"reflect"
 	"unsafe"
+<<<<<<< HEAD
 	"github.com/gin-gonic/gin"
 	"github.com/DeanThompson/ginpprof"
+=======
+	"runtime"
+	"log"
+>>>>>>> 34a4c234281770360360ea70fe3644a1831397e7
 )
 
 /**
@@ -60,7 +65,70 @@ func ginpprof_test() {   //https://github.com/jiushi506/ginpprof
 	//pointer_test()
 	//panic_test()
 	//string_test()
-	value_translate_test()
+	//value_translate_test()
+	//array_slice_difference_test()
+	//slice_test()
+	//read_memory_stat_test()
+	time_test()
+}
+
+func time_test() {
+	time1 := time.Now()
+	d, _ := time.ParseDuration("-144h")
+	time2 := time1.Add(d)
+	fmt.Println(time2)
+
+}
+
+func bigBytes() *[]byte {
+	s := make([]byte, 100000000)
+	return &s
+}
+
+func read_memory_stat_test() {
+	// 统计内存中在字节数组分配前后的大小对比
+	//https://studygolang.com/articles/12008?fr=sidebar
+	var mem runtime.MemStats
+
+	fmt.Println("memory baseline...")
+
+	runtime.ReadMemStats(&mem)
+	log.Println(mem.Alloc)
+	log.Println(mem.TotalAlloc)
+	log.Println(mem.HeapAlloc)
+	log.Println(mem.HeapSys)
+
+	for i := 0; i < 10; i++ {
+		s := bigBytes()
+		if s == nil {
+			log.Println("oh noes")
+		}
+	}
+
+	fmt.Println("memory comparison...")
+
+	runtime.ReadMemStats(&mem)
+	log.Println(mem.Alloc)
+	log.Println(mem.TotalAlloc)
+	log.Println(mem.HeapAlloc)
+	log.Println(mem.HeapSys)
+}
+
+func slice_test() {
+	var a = make([]int, 6)
+	b := a[1:3]
+	fmt.Printf("a's address %p\n",&a[0])
+	fmt.Printf("b's address %p\n",&b[0])  //a[0]和b[0]指向的地址差了一个元素的大小，说明reslice后指针直接指向a[low]的地址
+	b = append(b,2,3,4,5,6,7) // 元素个数超过cap时会重新分配地址，地址变了
+	fmt.Printf("b's address after append %p\n",&b[0])
+}
+func array_slice_difference_test() {
+	//var a [2]int
+	var b []int
+	c := []int{}
+	//fmt.Println(a == nil)  报错，数组不能和nil比较
+	fmt.Println(b == nil)
+	fmt.Println(c == nil)
 }
 
 func value_translate_test() {
