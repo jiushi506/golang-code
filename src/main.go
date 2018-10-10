@@ -36,6 +36,7 @@ func main() {
 	//unsafe_pointer_uintptr_test()
 	//var_test()
 	//map_test()
+<<<<<<< HEAD
 	ginpprof_test();
 }
 
@@ -55,6 +56,82 @@ func ginpprof_test() {   //https://github.com/jiushi506/ginpprof
 	// ginpprof.WrapGroup(group)
 
 	router.Run(":8080")
+=======
+	//pointer_test()
+	//panic_test()
+	//string_test()
+	value_translate_test()
+}
+
+func value_translate_test() {
+	var a = 2
+	b := a  // 如果改为 b := &a 那么三四行输出的value就一样了
+	//值传递，输出的地址不一样
+	fmt.Println("a's address:", &a, " a's value:",a)
+	fmt.Println("b's address:", &b, " b's value:",b)
+
+	change_value(&b)
+	fmt.Println("a's address:", &a, " a's value:",a)
+	fmt.Println("b's address:", &b, " b's value:",b)
+
+}
+func change_value(b *int) {
+	*b = 3
+}
+func string_test() {
+	s := "hello world"
+	s = "hello world2"
+	//reflect.ValueOf(&s).Pointer()  // reflect.ValueOf（）参数一定要是指针类型，否则会panic
+	fmt.Println(s)
+
+	b := []byte{1,2,3}
+	b[1] = 3
+	fmt.Println(b)
+
+	str := "welcome to outofmemory.cn"
+	fmt.Println("str[",str,"] 替换前地址：v%", &str)
+	str = strings.Replace(str, " ", ",", -1)
+	fmt.Println("str[",str,"] 替换后地址：v%", &str)
+	//输出地址是一样的，？？？？ 这是因为str原先在内存有一个地址，这个是不变的，string改变后，变的是str指向的地址
+}
+
+func panic_test() {
+	//panic_without_recover()
+	panic_with_recover()
+}
+
+func panic_with_recover() {
+	defer func() {  //recover()用于将panic的信息捕捉。recover必须定义在panic之前的defer语句中。
+		if err := recover(); err != nil {  //注意这里用分号隔开，为什么不是 && ?
+			fmt.Println("catch the panic:",err)
+		}
+		fmt.Println("execute 3")
+	}()
+	fmt.Println("execute 1")
+	panic("code panic")
+	fmt.Println("execute 2")  //即使recover捕获了异常，这一句也不会执行
+}
+
+func panic_without_recover() {
+	defer func() {
+		fmt.Println("execute 3")
+	}()
+	fmt.Println("execute 1")
+	panic("code panic")
+	fmt.Println("execute 2")
+}
+func pointer_test() {
+	a := new(int)
+	*a = 3
+	fmt.Println("a地址:",&a)   // #1 输出指针自身的地址
+	fmt.Println("a指向的地址:",a)  // #2  输出指针变量指向的地址
+	invoke_point(a)
+
+}
+func invoke_point(b *int) {
+	fmt.Println("a参数地址:",&b)  // #3  输出和#1不一样，因为是值传递，复制了一个地址
+	fmt.Println("a参数指向的地址:",b)  //#4  输出和#2一样，因为指针指向的地址是一样的
+>>>>>>> c3e016c05d356708f13b83dc4b73b00ccc98a6f3
 }
 
 func map_test() {
@@ -64,6 +141,7 @@ func map_test() {
 	value,ok = m["name don't exist"]
 	fmt.Println(value,ok)
 	fmt.Println(&m)
+	fmt.Println(1 << 0) // 1
 }
 
 func var_test() {
