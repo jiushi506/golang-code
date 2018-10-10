@@ -13,6 +13,8 @@ import (
 	"unsafe"
 	"runtime"
 	"log"
+	"io/ioutil"
+	"github.com/Jeffail/tunny"
 )
 
 /**
@@ -43,7 +45,55 @@ func main() {
 	//array_slice_difference_test()
 	//slice_test()
 	//read_memory_stat_test()
-	time_test()
+	//time_test()
+	//bit_calculate_test()
+	//new_object_test()
+	tunny_goroutine_test()
+}
+
+func tunny_goroutine_test() {
+	numCPUs := runtime.NumCPU()
+	pool := tunny.NewFunc(numCPUs, func(payload interface{}) interface{} {
+		var result []byte
+
+		// TODO: Something CPU heavy with payload
+		if value,ok := payload.([]uint8);ok {  // interface{} 需要断言才能转换
+			fmt.Println(string(value))
+		}
+		return result
+	})
+	defer pool.Close()
+
+	http.HandleFunc("/work", func(w http.ResponseWriter, r *http.Request) {
+		input, err := ioutil.ReadAll(r.Body)
+		if err != nil {
+			http.Error(w, "Internal error", http.StatusInternalServerError)
+		}
+		defer r.Body.Close()
+
+		// Funnel this work into our pool. This call is synchronous and will
+		// block until the job is completed.
+		result := pool.Process(input)
+
+		w.Write(result.([]byte))
+	})
+
+	http.ListenAndServe(":8080", nil)
+}
+
+func new_object_test() {
+	a := new(int64)
+	fmt.Println(a)
+}
+
+func bit_calculate_test() {
+	var in int64
+	tye := reflect.TypeOf(in)
+	fmt.Println("输出类型:",tye.Kind())
+
+    bitResult := 1 << 7
+	fmt.Println("输出位计算结果",bitResult)
+
 }
 
 func time_test() {
