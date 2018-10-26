@@ -2,27 +2,55 @@ package main
 
 import (
 	"fmt"
-	"sync"
 	"game"
-	"time"
-	"net/http"
-	"strings"
-	"os"
 	"io"
-	"reflect"
-	"unsafe"
-	//"github.com/DeanThompson/ginpprof"
-	"runtime"
 	"log"
-	"io/ioutil"
-	"github.com/Jeffail/tunny"
+	"net/http"
+	"os"
+	"reflect"
+	"runtime"
+	"strconv"
+	"strings"
+	"sync"
+	"time"
+	"unsafe"
 )
 
 /**
 查看文件的编译源码
 1. go build && main.go  //这个时候会生成一个 src.exe的文件
 2. go tool objdump -s "main.main" src.exe
- */
+*/
+
+const (
+	January time.Month = 1 + iota
+	February
+	March
+	April
+	May
+	June
+	July
+	August
+	September
+	October
+	November
+	December
+)
+
+var m = map[time.Month]int{
+	January:   1,
+	February:  2,
+	March:     3,
+	April:     4,
+	May:       5,
+	June:      6,
+	July:      7,
+	August:    8,
+	September: 9,
+	October:   10,
+	November:  11,
+	December:  12,
+}
 
 func main() {
 	//s := "hello" //这种简短赋值的方法只能用在函数内部
@@ -49,38 +77,162 @@ func main() {
 	//time_test()
 	//bit_calculate_test()
 	//new_object_test()
-	tunny_goroutine_test()
+	//tunny_goroutine_test()
+	//time2_test()
+	wild_code_test()
+	//calculateTime("s b")
 }
 
-func tunny_goroutine_test() {
-	numCPUs := runtime.NumCPU()
-	pool := tunny.NewFunc(numCPUs, func(payload interface{}) interface{} {
-		var result []byte
-
-		// TODO: Something CPU heavy with payload
-		if value,ok := payload.([]uint8);ok {  // interface{} 需要断言才能转换
-			fmt.Println(string(value))
+func wild_code_test() {
+	s := "echo {${hello world {${year}+COUNT}-{${month}+COUNT}-{${day}+COUNT} {${hour}+COUNT}:{${min}+COUNT}:{${second}COUNT}"
+	if !strings.Contains(s, "{${") {
+		return
+	}
+	result := ""
+	for {
+		if len(s) <= 0 {
+			break
 		}
-		return result
-	})
-	defer pool.Close()
-
-	http.HandleFunc("/work", func(w http.ResponseWriter, r *http.Request) {
-		input, err := ioutil.ReadAll(r.Body)
-		if err != nil {
-			http.Error(w, "Internal error", http.StatusInternalServerError)
+		tempstr := s
+		if !strings.Contains(s, "{${") {
+			fmt.Println(result)
+			return
 		}
-		defer r.Body.Close()
-
-		// Funnel this work into our pool. This call is synchronous and will
-		// block until the job is completed.
-		result := pool.Process(input)
-
-		w.Write(result.([]byte))
-	})
-
-	http.ListenAndServe(":8080", nil)
+		index := strings.LastIndex(s, "{${")
+		handleStr := s[index:len(s)] // {${second}COUNT}
+		lastBraceIndex := strings.LastIndex(s[0:index], "}")
+		if index == 0 {
+			s = ""
+		} else {
+			s = s[0 : lastBraceIndex+1] // {${year}+COUNT}-{${month}+COUNT}-{${day}+COUNT} {${hour}+COUNT}:{${min}+COUNT}
+		}
+		linkWild := tempstr[lastBraceIndex+1 : index]
+		timestr := calculateTime(handleStr)
+		result = linkWild + timestr + result
+	}
+	fmt.Println(result)
 }
+
+func calculateTime(handleStr string) string {
+	handleStr = handleStr[1 : len(handleStr)-1] //  ${month}+COUNT
+	plusIndex := 0
+	timeWild := ""
+	COUNT := ""
+	if !strings.Contains(handleStr, "+") { // 用户输错不包含 “+”
+		plusIndex = strings.LastIndex(handleStr, "}") + 1
+		timeWild = handleStr[0:plusIndex]
+		COUNT = handleStr[plusIndex:len(handleStr)]
+	} else { // 正确输入
+		plusIndex = strings.Index(handleStr, "+")
+		timeWild = handleStr[0:plusIndex]
+		COUNT = handleStr[plusIndex+1 : len(handleStr)]
+	}
+	timeStr := cgStrToTime(timeWild, COUNT)
+	return timeStr
+}
+
+func cgStrToTime(timeStr, COUNT string) (result string) {
+	count := 0
+	if COUNT != "COUNT" {
+		count, _ = strconv.Atoi(COUNT)
+	}
+	t := time.Now()
+	year, month, day := t.Date()
+	hour := t.Hour()
+	min := t.Minute()
+	second := t.Second()
+	preCount := 0
+	zeroPrefix := ""
+	switch timeStr {
+	case "${year}":
+		preCount = year + count
+	case "${month}":
+		preCount = m[month] + count
+		if preCount < 10 {
+			zeroPrefix = "0"
+		}
+	case "${day}":
+		preCount = day + count
+		if preCount < 10 {
+			zeroPrefix = "0"
+		}
+	case "${hour}":
+		preCount = hour + count
+		if preCount < 10 {
+			zeroPrefix = "0"
+		}
+	case "${min}":
+		preCount = min + count
+		if preCount < 10 {
+			zeroPrefix = "0"
+		}
+	case "${second}":
+		preCount = second + count
+		if preCount < 10 {
+			zeroPrefix = "0"
+		}
+	default:
+
+	}
+	result = zeroPrefix + strconv.Itoa(preCount)
+	return result
+}
+
+func restraint(preCount int, timeType string) int {
+	switch timeType {
+	case "Month":
+		if preCount < 1 {
+			preCount = 1
+		}
+		if preCount > 12 {
+			preCount = 12
+		}
+	}
+
+	return 1
+}
+
+func time2_test() {
+	t := time.Now()
+	y, m, d := t.Date()
+
+	today := time.Now().Format("2006-01-02")
+	datetime := time.Now().Format("20060102150405") //后面的参数是固定的 否则将无法正常输出
+
+	fmt.Println("time is : ", t)
+	fmt.Println("y m d is : ", y, m, d)
+	fmt.Println("now is :", today)
+	fmt.Println("now is :", datetime)
+
+}
+
+//func tunny_goroutine_test() {
+//	numCPUs := runtime.NumCPU()
+//	pool := tunny.NewFunc(numCPUs, func(payload interface{}) interface{} {
+//		var result []byte
+//
+//		// TODO: Something CPU heavy with payload
+//		if value,ok := payload.([]uint8);ok {  // interface{} 需要断言才能转换
+//			fmt.Println(string(value))
+//		}
+//		return result
+//	})
+//	defer pool.Close()
+//
+//	http.HandleFunc("/work", func(w http.ResponseWriter, r *http.Request) {
+//		input, err := ioutil.ReadAll(r.Body)
+//		if err != nil {
+//			http.Error(w, "Internal error", http.StatusInternalServerError)
+//		}
+//		defer r.Body.Close()
+//
+//		result := pool.Process(input)
+//
+//		w.Write(result.([]byte))
+//	})
+//
+//	http.ListenAndServe(":8080", nil)
+//}
 
 func new_object_test() {
 	a := new(int64)
@@ -90,10 +242,10 @@ func new_object_test() {
 func bit_calculate_test() {
 	var in int64
 	tye := reflect.TypeOf(in)
-	fmt.Println("输出类型:",tye.Kind())
+	fmt.Println("输出类型:", tye.Kind())
 
-    bitResult := 1 << 7
-	fmt.Println("输出位计算结果",bitResult)
+	bitResult := 1 << 7
+	fmt.Println("输出位计算结果", bitResult)
 
 }
 
@@ -142,10 +294,10 @@ func read_memory_stat_test() {
 func slice_test() {
 	var a = make([]int, 6)
 	b := a[1:3]
-	fmt.Printf("a's address %p\n",&a[0])
-	fmt.Printf("b's address %p\n",&b[0])  //a[0]和b[0]指向的地址差了一个元素的大小，说明reslice后指针直接指向a[low]的地址
-	b = append(b,2,3,4,5,6,7) // 元素个数超过cap时会重新分配地址，地址变了
-	fmt.Printf("b's address after append %p\n",&b[0])
+	fmt.Printf("a's address %p\n", &a[0])
+	fmt.Printf("b's address %p\n", &b[0]) //a[0]和b[0]指向的地址差了一个元素的大小，说明reslice后指针直接指向a[low]的地址
+	b = append(b, 2, 3, 4, 5, 6, 7)       // 元素个数超过cap时会重新分配地址，地址变了
+	fmt.Printf("b's address after append %p\n", &b[0])
 }
 func array_slice_difference_test() {
 	//var a [2]int
@@ -158,14 +310,14 @@ func array_slice_difference_test() {
 
 func value_translate_test() {
 	var a = 2
-	b := a  // 如果改为 b := &a 那么三四行输出的value就一样了
+	b := a // 如果改为 b := &a 那么三四行输出的value就一样了
 	//值传递，输出的地址不一样
-	fmt.Println("a's address:", &a, " a's value:",a)
-	fmt.Println("b's address:", &b, " b's value:",b)
+	fmt.Println("a's address:", &a, " a's value:", a)
+	fmt.Println("b's address:", &b, " b's value:", b)
 
 	change_value(&b)
-	fmt.Println("a's address:", &a, " a's value:",a)
-	fmt.Println("b's address:", &b, " b's value:",b)
+	fmt.Println("a's address:", &a, " a's value:", a)
+	fmt.Println("b's address:", &b, " b's value:", b)
 
 }
 func change_value(b *int) {
@@ -177,14 +329,14 @@ func string_test() {
 	//reflect.ValueOf(&s).Pointer()  // reflect.ValueOf（）参数一定要是指针类型，否则会panic
 	fmt.Println(s)
 
-	b := []byte{1,2,3}
+	b := []byte{1, 2, 3}
 	b[1] = 3
 	fmt.Println(b)
 
 	str := "welcome to outofmemory.cn"
-	fmt.Println("str[",str,"] 替换前地址：v%", &str)
+	fmt.Println("str[", str, "] 替换前地址：v%", &str)
 	str = strings.Replace(str, " ", ",", -1)
-	fmt.Println("str[",str,"] 替换后地址：v%", &str)
+	fmt.Println("str[", str, "] 替换后地址：v%", &str)
 	//输出地址是一样的，？？？？ 这是因为str原先在内存有一个地址，这个是不变的，string改变后，变的是str指向的地址
 }
 
@@ -194,15 +346,15 @@ func panic_test() {
 }
 
 func panic_with_recover() {
-	defer func() {  //recover()用于将panic的信息捕捉。recover必须定义在panic之前的defer语句中。
-		if err := recover(); err != nil {  //注意这里用分号隔开，为什么不是 && ?
-			fmt.Println("catch the panic:",err)
+	defer func() { //recover()用于将panic的信息捕捉。recover必须定义在panic之前的defer语句中。
+		if err := recover(); err != nil { //注意这里用分号隔开，为什么不是 && ?
+			fmt.Println("catch the panic:", err)
 		}
 		fmt.Println("execute 3")
 	}()
 	fmt.Println("execute 1")
 	panic("code panic")
-	fmt.Println("execute 2")  //即使recover捕获了异常，这一句也不会执行
+	fmt.Println("execute 2") //即使recover捕获了异常，这一句也不会执行
 }
 
 func panic_without_recover() {
@@ -216,22 +368,22 @@ func panic_without_recover() {
 func pointer_test() {
 	a := new(int)
 	*a = 3
-	fmt.Println("a地址:",&a)   // #1 输出指针自身的地址
-	fmt.Println("a指向的地址:",a)  // #2  输出指针变量指向的地址
+	fmt.Println("a地址:", &a)   // #1 输出指针自身的地址
+	fmt.Println("a指向的地址:", a) // #2  输出指针变量指向的地址
 	invoke_point(a)
 
 }
 func invoke_point(b *int) {
-	fmt.Println("a参数地址:",&b)  // #3  输出和#1不一样，因为是值传递，复制了一个地址
-	fmt.Println("a参数指向的地址:",b)  //#4  输出和#2一样，因为指针指向的地址是一样的
+	fmt.Println("a参数地址:", &b)   // #3  输出和#1不一样，因为是值传递，复制了一个地址
+	fmt.Println("a参数指向的地址:", b) //#4  输出和#2一样，因为指针指向的地址是一样的
 }
 
 func map_test() {
-	var m = map[string]string{"name":"zhangsan","pass":"zhangsan'pass"}
-	value,ok := m["name"]  //map取值可以返回两个值
-	fmt.Println(value,ok)
-	value,ok = m["name don't exist"]
-	fmt.Println(value,ok)
+	var m = map[string]string{"name": "zhangsan", "pass": "zhangsan'pass"}
+	value, ok := m["name"] //map取值可以返回两个值
+	fmt.Println(value, ok)
+	value, ok = m["name don't exist"]
+	fmt.Println(value, ok)
 	fmt.Println(&m)
 	fmt.Println(1 << 0) // 1
 }
@@ -239,39 +391,39 @@ func map_test() {
 func var_test() {
 	var a = 3
 	const b = 4
-	fmt.Println(&a,a)
+	fmt.Println(&a, a)
 	//fmt.Println(&b,b)  //不能引用constant的地址，因为常量在编译预处理阶段直接展开，作为指令数据使用，没有地址
-	arr := make([]int,1)
+	arr := make([]int, 1)
 	fmt.Println(reflect.TypeOf(arr))
 }
 
 func unsafe_pointer_uintptr_test() {
 	a := [4]int64{5, 1, 2, 3}
-	fmt.Println(unsafe.Sizeof(&a[0]))  // 每个元素占8个字节，64位
-	fmt.Println(unsafe.Pointer(&a[0]),unsafe.Pointer(&a[1]),unsafe.Pointer(&a[2]),unsafe.Pointer(&a[3])) //输出每个元素的内存地址 16进制
+	fmt.Println(unsafe.Sizeof(&a[0]))                                                                       // 每个元素占8个字节，64位
+	fmt.Println(unsafe.Pointer(&a[0]), unsafe.Pointer(&a[1]), unsafe.Pointer(&a[2]), unsafe.Pointer(&a[3])) //输出每个元素的内存地址 16进制
 	p := uintptr(unsafe.Pointer(&a[0]))
-	fmt.Println(p)   //输出a[0]的内存地址 10进制
+	fmt.Println(p) //输出a[0]的内存地址 10进制
 	p1 := unsafe.Pointer(p)
-	fmt.Println(*(* int64)(p1))  // 根据p1的地址输出对应的值 （* int64)表示先转化为 int64 指针， * 表示取值
+	fmt.Println(*(*int64)(p1)) // 根据p1的地址输出对应的值 （* int64)表示先转化为 int64 指针， * 表示取值
 }
 
 func wait_group_test() {
-	var waitGroup sync.WaitGroup //定义一个同步等待的组
-	waitGroup.Add(1) //添加一个计数
+	var waitGroup sync.WaitGroup   //定义一个同步等待的组
+	waitGroup.Add(1)               //添加一个计数
 	go game.ConnSocket(&waitGroup) //调用其他包的方法执行任务
-	waitGroup.Wait() //阻塞直到所有任务完成
+	waitGroup.Wait()               //阻塞直到所有任务完成
 	fmt.Println("main DONE!!!")
 }
 
 func close_channel_test() {
-	ch := make(chan string,2)
-	go func(in chan <- string) {
+	ch := make(chan string, 2)
+	go func(in chan<- string) {
 		in <- "hello"
 		//time.Sleep(time.Second * 7) //这里如果睡眠7秒再写入数据就会报错，因为这个时候channel已经被关闭了
 		in <- "world"
 	}(ch)
 
-	go func(out <- chan string) {
+	go func(out <-chan string) {
 		fmt.Println(<-out)
 		time.Sleep(time.Second * 4)
 		fmt.Println(<-out)
@@ -288,21 +440,21 @@ func select_channel_test() {
 	process1 := make(chan string)
 	process2 := make(chan string)
 
-	go func (in chan <- string) {
+	go func(in chan<- string) {
 		in <- "hello"
 	}(process1)
 
-	go func (in chan <- string) {
+	go func(in chan<- string) {
 		in <- "world"
 	}(process2)
 
 	time.Sleep(time.Second * 2) //如果没有这一句，会输出两个default operation,因为两个协程来不及往通道放数据
-	for i:=0;i<2;i++{ //如果不加for循环，select找到一个匹配的条件就退出了
+	for i := 0; i < 2; i++ {    //如果不加for循环，select找到一个匹配的条件就退出了
 		select {
-		case str := <- process1:
-			fmt.Println("process1 data",str)
-		case str := <- process2:
-			fmt.Println("process2 data",str)
+		case str := <-process1:
+			fmt.Println("process1 data", str)
+		case str := <-process2:
+			fmt.Println("process2 data", str)
 		default:
 			fmt.Println("default operation")
 		}
@@ -313,12 +465,12 @@ func select_channel_test() {
 func single_channel_test() {
 	ch := make(chan string)
 
-	go func(out chan<- string){
+	go func(out chan<- string) {
 		out <- "hello"
 	}(ch)
 
-	go func(in <-chan string){
-		fmt.Println( <- in)
+	go func(in <-chan string) {
+		fmt.Println(<-in)
 		//fmt.Println( <- in)
 		fmt.Println("execute here") //多加一个fmt.Println( <- in) 这里就阻塞不会执行，一直到main运行结束
 	}(ch)
@@ -326,7 +478,7 @@ func single_channel_test() {
 }
 
 func channel_test() {
-	ch := make(chan string,2)
+	ch := make(chan string, 2)
 	//ch := make(chan string)
 	go func() {
 		// 当channel只能包含一个元素时，在执行到这一步的时候main goroutine才会停止阻塞
