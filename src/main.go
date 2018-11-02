@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"flag"
 	"fmt"
 	"game"
@@ -95,10 +94,9 @@ func main() {
 	//new_object_test()
 	//tunny_goroutine_test()
 	//time2_test()
-	//wild_code_test()
-	golang_replace_all_test()
+	fmt.Println(wild_code_test())
+	//golang_replace_all_test()
 	//calculateTime("s b")
-	//josn_marshall_test()
 }
 
 func golang_replace_all_test() {
@@ -180,76 +178,66 @@ func replaceStr(timeStr string) (result string) {
 	return result
 }
 
-func josn_marshall_test() {
-	str := "  {\"msgType\":1,\"entity\":{\"Id\":81233,\"BussinessName\":\"test_001_httppost\",\"BussinessDesc\":\" \",\"UniqFlag\":1,\"BussinessID\":\"1049216226091372544\",\"BussinessArgs\":\"{\"taskType\":1,\"httpInfo\":{\"method\":\"post\",\"headerInfo\":\"{}\",\"Url\":\"http://10.0.1.230:8779/index/workflowcallback\",\"body\":\"\"},\"shellInfo\":null}\",\"Callback\":\"\",\"IsSync\":2,\"ExecStatus\":0,\"ErrorMsg\":\"\",\"AsyncResult\":\"\",\"StartTime\":\"0001-01-01T00:00:00Z\",\"EndTime\":\"0001-01-01T00:00:00Z\",\"NotifyPersons\":\"glacierli;restliu\",\"CreateTime\":\"0001-01-01T00:00:00Z\",\"UpdateTime\":\"0001-01-01T00:00:00Z\"},\"BussinessCallBack\":null}"
-	args, _ := json.Marshal(str)
-	fmt.Println(args)
-}
-func wild_code_test() {
-	s := "echo sss {${year} hello world {${year}+COUNT}-{${month}+COUNT}-{${day}+COUNT} {${hour}+COUNT}:{${min}+COUNT}:{${second}+COUNT} sss"
+func wild_code_test() string {
+	s := "echo sss ${${year} hello world ${${year}+COUNT}-${${month}-COUNT}-${${day}/COUNT} ${${hour}abcCOUNT}:${${min}+COUNT}:${${second}+COUNT} sss"
 	//s := "hello world {${year}+1}"
-	if !strings.Contains(s, "{${") {
+	if !strings.Contains(s, "${${") {
 		fmt.Println("s: ", s)
-		return
+		return s
 	}
 	result := ""
-	postfix := ""
 	for {
 		if len(s) <= 0 {
 			break
 		}
-		tempstr := s
-		index := strings.LastIndex(s, "{${")
-		handleStr := s[index:len(s)]
+		postfix := ""
+		index := strings.LastIndex(s, "${${")
+		if index == -1 {
+			return s + result
+		}
+		handleStr := s[index:len(s)] //${${second}+COUNT}
 		postfixIndex := strings.LastIndex(handleStr, "}")
+		if postfixIndex == -1 {
+			return s + result
+		}
 		if postfixIndex != -1 && postfixIndex != len(handleStr)-1 {
 			postfix = handleStr[postfixIndex+1 : len(handleStr)]
+			handleStr = handleStr[:postfixIndex+1]
 		}
-		lastBraceIndex := strings.LastIndex(s[0:index], "}")
+		timestr := calculateTime(handleStr)
+		result = timestr + postfix + result
 		if index == 0 {
 			s = ""
+		} else if index == -1 {
+			break
 		} else {
-			s = s[0 : lastBraceIndex+1]
+			s = s[0:index]
 		}
-		linkWild := tempstr[lastBraceIndex+1 : index]
-		timestr := calculateTime(handleStr)
-		result = linkWild + timestr + postfix + result
-		//if lastBraceIndex == -1 { // 说明下次没有需要解析的 {${year}+COUNT}了
-		//	fmt.Println("s + result: ", s+result)
-		//	fmt.Println(result)
-		//	return
-		//}
-		postfix = ""
 	}
-	fmt.Println(result)
+	fmt.Println(s + result)
+	return s + result
 }
 
-func calculateTime(handleStr string) string {
+func calculateTime(handleStr string) string { // ${${month}+COUNT}
 	if !isValidTimeString(handleStr) {
 		return handleStr
 	}
-	handleStr = handleStr[1 : len(handleStr)-1] //  ${month}+COUNT
-	plusIndex := 0
-	timeWild := ""
-	COUNT := ""
-	if !strings.Contains(handleStr, "+") { // 用户输错不包含 “+”
-		plusIndex = strings.LastIndex(handleStr, "}") + 1
-		timeWild = handleStr[0:plusIndex]
-		COUNT = handleStr[plusIndex:len(handleStr)]
-	} else { // 正确输入
-		plusIndex = strings.Index(handleStr, "+")
-		timeWild = handleStr[0:plusIndex]
-		COUNT = handleStr[plusIndex+1 : len(handleStr)]
+	handleStr = handleStr[2 : len(handleStr)-1] //  ${month}+COUNT
+	rightIndex := strings.LastIndex(handleStr, "}")
+	if rightIndex == -1 {
+		return "${" + handleStr + "}"
 	}
+	timeWild := handleStr[0 : rightIndex+1]
+	COUNT := handleStr[rightIndex+1 : len(handleStr)]
 	timeStr := cgStrToTime(timeWild, COUNT)
 	return timeStr
 }
 
 func cgStrToTime(timeStr, COUNT string) (result string) {
-	count := 0
-	if COUNT != "COUNT" {
-		count, _ = strconv.Atoi(COUNT)
+	if !isValidCOUNT(COUNT) {
+		return "${" + timeStr + COUNT + "}"
 	}
+	fmt.Println("timeStr:", timeStr, "COUNT:", COUNT)
 	t := time.Now()
 	year, month, day := t.Date()
 	hour := t.Hour()
@@ -259,37 +247,48 @@ func cgStrToTime(timeStr, COUNT string) (result string) {
 	zeroPrefix := ""
 	switch timeStr {
 	case "${year}":
-		preCount = year + count
+		preCount = calculateCOUNT(year, COUNT)
 	case "${month}":
-		preCount = m[month] + count
-		if preCount < 10 {
-			zeroPrefix = "0"
-		}
+		preCount = calculateCOUNT(m[month], COUNT)
 	case "${day}":
-		preCount = day + count
-		if preCount < 10 {
-			zeroPrefix = "0"
-		}
+		preCount = calculateCOUNT(day, COUNT)
 	case "${hour}":
-		preCount = hour + count
-		if preCount < 10 {
-			zeroPrefix = "0"
-		}
+		preCount = calculateCOUNT(hour, COUNT)
 	case "${min}":
-		preCount = min + count
-		if preCount < 10 {
-			zeroPrefix = "0"
-		}
+		preCount = calculateCOUNT(min, COUNT)
 	case "${second}":
-		preCount = second + count
-		if preCount < 10 {
-			zeroPrefix = "0"
-		}
+		preCount = calculateCOUNT(second, COUNT)
 	default:
 		return "{" + COUNT + "}"
 
 	}
+	if preCount < 10 {
+		zeroPrefix = "0"
+	}
 	result = zeroPrefix + strconv.Itoa(preCount)
+	return result
+}
+
+func isValidCOUNT(COUNT string) bool {
+	if len(COUNT) == 0 {
+		return true
+	}
+	if COUNT[:1] != "+" && COUNT[:1] != "-" && COUNT[:1] != "*" && COUNT[:1] != "/" {
+		return false
+	}
+	return true
+}
+
+func calculateCOUNT(preCount int, COUNT string) int {
+	result := preCount
+	if len(COUNT) == 0 {
+		return result
+	}
+	switch COUNT[:1] {
+	case "+":
+
+	}
+
 	return result
 }
 
