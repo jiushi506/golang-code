@@ -1,6 +1,8 @@
 package main
 
 import (
+	"encoding/json"
+	"flag"
 	"fmt"
 	"game"
 	"io"
@@ -9,6 +11,7 @@ import (
 	"os"
 	"reflect"
 	"runtime"
+	"runtime/pprof"
 	"strconv"
 	"strings"
 	"sync"
@@ -52,7 +55,20 @@ var m = map[time.Month]int{
 	December:  12,
 }
 
+var (
+	//定义外部输入文件名字
+	cpuprofile = flag.String("cpuprofile", "", "write cpu profile to file.")
+)
+
 func main() {
+	// 查看输出性能文件        go tool pprof ./Main cpu.pprof  交互式页面输入 web,直接浏览器查看
+	f, err := os.Create("cpu.pprof")
+	if err != nil {
+		log.Fatal(err)
+	}
+	pprof.StartCPUProfile(f)
+	defer pprof.StopCPUProfile()
+
 	//s := "hello" //这种简短赋值的方法只能用在函数内部
 	//fmt.Println(s)
 	//file_test()
@@ -79,41 +95,139 @@ func main() {
 	//new_object_test()
 	//tunny_goroutine_test()
 	//time2_test()
-	wild_code_test()
+	//wild_code_test()
+	golang_replace_all_test()
 	//calculateTime("s b")
+	//josn_marshall_test()
 }
 
+func golang_replace_all_test() {
+	s := "echo sss ${year} hello world ${year}+COUNT-${month}+COUNT-${day}+COUNT ${hour}+COUNT:${min}+COUNT:${second}+COUNT sss"
+	if strings.Contains(s, "${year}") {
+		yearStr := replaceStr("${year}")
+		s = strings.Replace(s, "${year}", yearStr, -1)
+		fmt.Println(s)
+	}
+	if strings.Contains(s, "${month}") {
+		monthStr := replaceStr("${month}")
+		s = strings.Replace(s, "${month}", monthStr, -1)
+		fmt.Println(s)
+	}
+	if strings.Contains(s, "${day}") {
+		dayStr := replaceStr("${day}")
+		s = strings.Replace(s, "${day}", dayStr, -1)
+		fmt.Println(s)
+	}
+	if strings.Contains(s, "${hour}") {
+		hourStr := replaceStr("${hour}")
+		s = strings.Replace(s, "${hour}", hourStr, -1)
+		fmt.Println(s)
+	}
+	if strings.Contains(s, "${min}") {
+		minStr := replaceStr("${min}")
+		s = strings.Replace(s, "${min}", minStr, -1)
+		fmt.Println(s)
+	}
+	if strings.Contains(s, "${second}") {
+		secondStr := replaceStr("${second}")
+		s = strings.Replace(s, "${second}", secondStr, -1)
+		fmt.Println(s)
+	}
+	fmt.Println(s)
+}
+
+func replaceStr(timeStr string) (result string) {
+	count := 0
+	t := time.Now()
+	year, month, day := t.Date()
+	hour := t.Hour()
+	min := t.Minute()
+	second := t.Second()
+	preCount := 0
+	zeroPrefix := ""
+	switch timeStr {
+	case "${year}":
+		preCount = year + count
+	case "${month}":
+		preCount = m[month] + count
+		if preCount < 10 {
+			zeroPrefix = "0"
+		}
+	case "${day}":
+		preCount = day + count
+		if preCount < 10 {
+			zeroPrefix = "0"
+		}
+	case "${hour}":
+		preCount = hour + count
+		if preCount < 10 {
+			zeroPrefix = "0"
+		}
+	case "${min}":
+		preCount = min + count
+		if preCount < 10 {
+			zeroPrefix = "0"
+		}
+	case "${second}":
+		preCount = second + count
+		if preCount < 10 {
+			zeroPrefix = "0"
+		}
+	default:
+
+	}
+	result = zeroPrefix + strconv.Itoa(preCount)
+	return result
+}
+
+func josn_marshall_test() {
+	str := "  {\"msgType\":1,\"entity\":{\"Id\":81233,\"BussinessName\":\"test_001_httppost\",\"BussinessDesc\":\" \",\"UniqFlag\":1,\"BussinessID\":\"1049216226091372544\",\"BussinessArgs\":\"{\"taskType\":1,\"httpInfo\":{\"method\":\"post\",\"headerInfo\":\"{}\",\"Url\":\"http://10.0.1.230:8779/index/workflowcallback\",\"body\":\"\"},\"shellInfo\":null}\",\"Callback\":\"\",\"IsSync\":2,\"ExecStatus\":0,\"ErrorMsg\":\"\",\"AsyncResult\":\"\",\"StartTime\":\"0001-01-01T00:00:00Z\",\"EndTime\":\"0001-01-01T00:00:00Z\",\"NotifyPersons\":\"glacierli;restliu\",\"CreateTime\":\"0001-01-01T00:00:00Z\",\"UpdateTime\":\"0001-01-01T00:00:00Z\"},\"BussinessCallBack\":null}"
+	args, _ := json.Marshal(str)
+	fmt.Println(args)
+}
 func wild_code_test() {
-	s := "echo {${hello world {${year}+COUNT}-{${month}+COUNT}-{${day}+COUNT} {${hour}+COUNT}:{${min}+COUNT}:{${second}COUNT}"
+	s := "echo sss {${year} hello world {${year}+COUNT}-{${month}+COUNT}-{${day}+COUNT} {${hour}+COUNT}:{${min}+COUNT}:{${second}+COUNT} sss"
+	//s := "hello world {${year}+1}"
 	if !strings.Contains(s, "{${") {
+		fmt.Println("s: ", s)
 		return
 	}
 	result := ""
+	postfix := ""
 	for {
 		if len(s) <= 0 {
 			break
 		}
 		tempstr := s
-		if !strings.Contains(s, "{${") {
-			fmt.Println(result)
-			return
-		}
 		index := strings.LastIndex(s, "{${")
-		handleStr := s[index:len(s)] // {${second}COUNT}
+		handleStr := s[index:len(s)]
+		postfixIndex := strings.LastIndex(handleStr, "}")
+		if postfixIndex != -1 && postfixIndex != len(handleStr)-1 {
+			postfix = handleStr[postfixIndex+1 : len(handleStr)]
+		}
 		lastBraceIndex := strings.LastIndex(s[0:index], "}")
 		if index == 0 {
 			s = ""
 		} else {
-			s = s[0 : lastBraceIndex+1] // {${year}+COUNT}-{${month}+COUNT}-{${day}+COUNT} {${hour}+COUNT}:{${min}+COUNT}
+			s = s[0 : lastBraceIndex+1]
 		}
 		linkWild := tempstr[lastBraceIndex+1 : index]
 		timestr := calculateTime(handleStr)
-		result = linkWild + timestr + result
+		result = linkWild + timestr + postfix + result
+		//if lastBraceIndex == -1 { // 说明下次没有需要解析的 {${year}+COUNT}了
+		//	fmt.Println("s + result: ", s+result)
+		//	fmt.Println(result)
+		//	return
+		//}
+		postfix = ""
 	}
 	fmt.Println(result)
 }
 
 func calculateTime(handleStr string) string {
+	if !isValidTimeString(handleStr) {
+		return handleStr
+	}
 	handleStr = handleStr[1 : len(handleStr)-1] //  ${month}+COUNT
 	plusIndex := 0
 	timeWild := ""
@@ -172,10 +286,20 @@ func cgStrToTime(timeStr, COUNT string) (result string) {
 			zeroPrefix = "0"
 		}
 	default:
+		return "{" + COUNT + "}"
 
 	}
 	result = zeroPrefix + strconv.Itoa(preCount)
 	return result
+}
+
+func isValidTimeString(timeStr string) bool {
+	if !strings.Contains(timeStr, "${year}") && !strings.Contains(timeStr, "${month}") &&
+		!strings.Contains(timeStr, "${day}") && !strings.Contains(timeStr, "${hour}") &&
+		!strings.Contains(timeStr, "${min}") && !strings.Contains(timeStr, "${second}") {
+		return false
+	}
+	return true
 }
 
 func restraint(preCount int, timeType string) int {
