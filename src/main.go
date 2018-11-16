@@ -7,6 +7,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"reflect"
 	"runtime"
@@ -54,10 +55,35 @@ var m = map[time.Month]int{
 	December:  12,
 }
 
+type HandleLock struct {
+	sync.Mutex
+	locked bool
+}
+
+type wfeProcInsModelImpl struct {
+	sync.Mutex
+	lockMap map[int64]HandleLock
+}
+
+func (m *wfeProcInsModelImpl) checkLockCap() {
+	if len(m.lockMap) >= 3 { // 超过容量，重新分配
+		m.Lock()
+		if len(m.lockMap) >= 3 {
+			for k, v := range m.lockMap {
+				if !v.locked {
+					delete(m.lockMap, k)
+				}
+			}
+		}
+		m.Unlock()
+	}
+}
+
 var (
 	//定义外部输入文件名字
 	cpuprofile = flag.String("cpuprofile", "", "write cpu profile to file.")
 )
+var i = 0
 
 func main() {
 	// 查看输出性能文件        go tool pprof ./Main cpu.pprof  交互式页面输入 web,直接浏览器查看
@@ -94,11 +120,54 @@ func main() {
 	//new_object_test()
 	//tunny_goroutine_test()
 	//time2_test()
-	fmt.Println(wild_code_test())
+	//fmt.Println(wild_code_test())
 	//golang_replace_all_test()
 	//calculateTime("s b")
+	//url_test()
+	lock_test()
 }
 
+func lock_test() {
+	//runtime.GOMAXPROCS(1)
+	//arr := []int64{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}
+	arr := []int64{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1}
+	m := wfeProcInsModelImpl{}
+	m.lockMap = make(map[int64]HandleLock, 0)
+	for _, v := range arr {
+		go handle(v, &m)
+	}
+}
+
+func handle(v int64, m *wfeProcInsModelImpl) {
+	m.checkLockCap()
+	var lc HandleLock
+	m.Lock()
+	lc, ok := m.lockMap[v]
+	if ok {
+		lc.Lock()
+		lc.locked = true
+		i++
+		fmt.Println("exist i ========= ", i)
+	} else {
+		m.lockMap[v] = HandleLock{}
+		lc = m.lockMap[v]
+		lc.Lock()
+		lc.locked = true
+		i++
+		fmt.Println("noexist i ========= ", i)
+	}
+	m.Unlock()
+	fmt.Println("---> i", i)
+	lc.Unlock()
+	lc.locked = false
+}
+
+func url_test() {
+	urls := "http%3A%2F%2F10.0.1.133%3A6666%2FAutoWorkflow%2FSubmitProcIns%3FparentTaskHandelUrl%3Dhttp%3A%2F%2F10.0.1.133%3A6666%2FAutoWorkflow%2FTaskHandle%26bussinessId%3D1061524390132338714"
+	fmt.Println("url before:", urls)
+	urls, _ = url.QueryUnescape(urls)
+	fmt.Println("url after:", urls)
+}
 func golang_replace_all_test() {
 	s := "echo sss ${year} hello world ${year}+COUNT-${month}+COUNT-${day}+COUNT ${hour}+COUNT:${min}+COUNT:${second}+COUNT sss"
 	if strings.Contains(s, "${year}") {
@@ -284,11 +353,26 @@ func calculateCOUNT(preCount int, COUNT string) int {
 	if len(COUNT) == 0 {
 		return result
 	}
+	expression := COUNT[1:]
+	cal := calculateExpression(expression)
 	switch COUNT[:1] {
 	case "+":
-
+		result = result + cal
+	case "-":
+		result = result - cal
+	case "*":
+		result = result * cal
+	case "/":
+		if cal == 0 {
+			return result
+		}
+		result = result / cal
 	}
+	return result
+}
 
+func calculateExpression(expression string) int {
+	result := 0
 	return result
 }
 
